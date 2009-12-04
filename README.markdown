@@ -78,4 +78,5 @@ To Dos
 ======
 
 - Support more commands (eg search).
+- Implement the daemon command together with the -t/--time, that will spawn a process that periodically checks for new tweets every given seconds. This will save a PID file on the ~/.twitter dir, that will be used to shut down that daemon (command name?).
 - Accept suggestions.
