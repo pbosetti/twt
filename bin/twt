@@ -80,23 +80,37 @@ class Twt
     self.config = {:user=>"",:pass=>""}
   end
   
-  def query(kind)
+  def query(kind, user=nil)
     self.connect
-    count = (@cfg[:count] || DEFAULT_COUNT)
-    puts "SHOWING LAST #{count} #{kind.to_s.upcase} MESSAGES:"
-    actual_timeline = @client.method("#{kind.to_s}".to_sym)
-    actual_timeline.call(:count=>count).reverse.each {|tweet|
+    count = (@cfg[:count] || 0)
+    latest = (@cfg[:latest] || {})
+    puts "SHOWING LAST #{count == 0 ? "UNREAD" : count} #{kind.to_s.upcase} MESSAGES:"
+    actual_timeline = @client.method(kind.to_sym)
+    call_arg = Hash.new
+    if @cfg[:count] and @cfg[:count] > 0 then
+      call_arg = {:count=>count}
+    elsif latest[kind]
+      call_arg = {:since_id=>latest[kind]}
+    end
+    if user then
+      call_arg[:id] = user
+    end
+    tweets = actual_timeline.call(call_arg).reverse
+    tweets.each {|tweet|
       if @raw then
         pp tweet
       else
-        dt = DateTime.parse(tweet.created_at).strftime("%m/%d %H:%M")
-        head = "[#{tweet.user.screen_name} #{dt}] "
+        latest[kind.to_sym] = tweet.id
+        time = DateTime.parse(tweet.created_at)
+        timeshort = time.strftime("%m/%d %H:%M")
+        head = "[#{tweet.user.screen_name} #{timeshort}] "
         text = tweet.text.partition((@cfg[:width] || DEFAULT_WIDTH)-head.length)
         text = text*("\n"+" "*head.length)
         puts "#{head}#{text}"
         puts if @cfg[:space]
       end
     }
+    self.config = {:latest => latest}
   end
   
   def post(msg)
@@ -144,7 +158,7 @@ begin
   when "post"
     twt.post(ARG)
   when "user"
-    twt.query(:user_timeline)
+    twt.query(:user_timeline, ARG)
   when "friends"
     twt.query(:friends_timeline)
   when "mention"

@@ -43,6 +43,10 @@ To read you friends timeline, your own timeline, and the tweets mentioning you, 
     % twt user
     % twt mention
     
+You can also get a specific user's timeline (in the example, mine):
+    
+    % twt user p4010
+    
 Post a message
 --------------
 To post a new message, issue:
@@ -61,7 +65,7 @@ Options
 -------
 At the moment, the following options are supported:
 
-- -cN: limits ANY subsequent query to N results (i.e. tweets) (sticky)
+- -cN: limits ANY subsequent query to N results (i.e. tweets). **If you set the number to 0 (zero) you only get the new messages since your last query** (sticky)
 - -wN: format messages to be nicely represented in a console of width N (sticky)
 - -r:  prints out results in raw format (useful for debug or Twitter API inspection)
 - -s:  toggles the insertion of an empty line between each result (sticky)
@@ -74,5 +78,4 @@ To Dos
 ======
 
 - Support more commands (eg search).
-- Extend the mention search so that it accepts usernames too.
 - Accept suggestions.
