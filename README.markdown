@@ -1,7 +1,18 @@
 twt - A simple CLI Twitter client
 =================================
-
 twt is a Twitter client designed to be as easy as possible to be used from CLI. You'll never have to switch from your preferred console to the browser and check latest tweets anymore.
+
+Installation
+============
+You need a working Ruby environment. On Linux and OS X, the default ruby 1.8.7 is OK (but if you want Ruby 1.9.2 is OK too).
+
+Then you have to install twt via rubygems:
+
+    % sudo gem install twt
+    
+This will also install a few dependencies.
+
+If you are on Windows, well, just try and let me know if it works.
 
 Usage
 =====
