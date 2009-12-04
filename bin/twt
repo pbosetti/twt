@@ -1,0 +1,166 @@
+#!/usr/bin/env ruby
+#  untitled
+#
+#  Created by Paolo Bosetti on 2009-12-03.
+#  Copyright (c) 2009 University of Trento. All rights reserved.
+#
+require 'rubygems'
+require "twitter"
+require "optparse"
+require "yaml"
+require "pp"
+
+DATA_DIR = "#{ENV['HOME']}/.twitter"
+AUTH_FILE = "cfg.yaml"
+DEFAULT_COUNT = 10
+DEFAULT_WIDTH = 80
+COMMANDS = %w|login logout post user friends mention reset|
+
+class OptsError < Exception; end
+class CredentialsError < Exception; end
+
+class String
+  def partition(w)
+    if self.length <= w
+      return [self]
+    else
+      return [self[0...w], self[w..-1].partition(w)]
+    end
+  end
+end
+
+class Twt
+  attr_accessor :raw
+  def initialize
+    @raw = false
+    Dir.mkdir(DATA_DIR) unless File.directory?(DATA_DIR)
+    begin
+      @cfg = File.open("#{DATA_DIR}/#{AUTH_FILE}") { |file| YAML.load(file) } || Hash.new
+    rescue
+      @cfg = Hash.new
+    end
+  end
+  
+  def connect
+    httpauth = Twitter::HTTPAuth.new(@cfg[:user], @cfg[:pass])
+    @client = Twitter::Base.new(httpauth)
+  end
+  
+  def config=(h)
+    @cfg.merge!(h)
+    File.open("#{DATA_DIR}/#{AUTH_FILE}", "w") { |file| 
+      YAML.dump(@cfg, file)
+    }
+  end
+  
+  def config
+    @cfg
+  end
+  
+  def reset
+    File.unlink("#{DATA_DIR}/#{AUTH_FILE}")
+  end
+  
+  def login(credentials)
+    credentials = credentials.split(":")
+    begin
+      raise CredentialsError unless credentials.size == 2
+      self.config = {:user=>credentials[0],:pass=>credentials[1]}
+      self.connect
+      @client.user_timeline
+      puts "Authorization succesfully completed."
+    rescue Twitter::Unauthorized
+      warn "Authorization error. Check User name and password."
+    rescue CredentialsError
+      warn "Login format error: Login with twt login USER:PASS"
+    end
+  end
+  
+  def logout
+    self.config = {:user=>"",:pass=>""}
+  end
+  
+  def query(kind)
+    self.connect
+    count = (@cfg[:count] || DEFAULT_COUNT)
+    puts "SHOWING LAST #{count} #{kind.to_s.upcase} MESSAGES:"
+    actual_timeline = @client.method("#{kind.to_s}".to_sym)
+    actual_timeline.call(:count=>count).reverse.each {|tweet|
+      if @raw then
+        pp tweet
+      else
+        dt = DateTime.parse(tweet.created_at).strftime("%m/%d %H:%M")
+        head = "[#{tweet.user.screen_name} #{dt}] "
+        text = tweet.text.partition((@cfg[:width] || DEFAULT_WIDTH)-head.length)
+        text = text*("\n"+" "*head.length)
+        puts "#{head}#{text}"
+        puts if @cfg[:space]
+      end
+    }
+  end
+  
+  def post(msg)
+    self.connect
+    if msg.length >= 140 then
+      msg = msg[0...-3]+"..."
+      warn "your message has been shortened to 140 chars."
+    end
+    begin
+      @client.update(msg)
+      puts "Succesfully posted \"#{msg}\""
+    rescue
+      warn "Error posting your message.\n Error was: #{$!}"
+    end
+  end
+end
+
+twt = Twt.new
+opts = OptionParser.new
+opts.banner = "Usage: twt [options] #{COMMANDS*'|'} [argument]\nArguments are:"
+
+begin
+  opts.on("-cCOUNT", "--count COUNT", "Messages to get (sticky)", Integer) {|v|
+    twt.config = {:count => v}
+  }
+  opts.on("-wCOUNT", "--width COUNT", "Set message width (sticky)", Integer) {|v|
+    twt.config = {:width => v}
+  }
+  opts.on("-r", "--raw", "Output raw data", TrueClass) {|v|
+    twt.raw = v
+  }
+  opts.on("-s", "--space", "Toggle empty line between tweets (sticky)", TrueClass) {|v|
+    twt.config = {:space => !twt.config[:space]}
+  }
+  
+  rest = opts.parse ARGV
+  CMD, ARG = rest
+  raise OptsError unless COMMANDS.include?(CMD)
+
+  case CMD
+  when "login"
+    twt.login(ARG)
+  when "logout"
+    twt.logout
+  when "post"
+    twt.post(ARG)
+  when "user"
+    twt.query(:user_timeline)
+  when "friends"
+    twt.query(:friends_timeline)
+  when "mention"
+    twt.query(:mentions)
+  when "reset"
+    twt.reset
+  end
+rescue OptsError
+  warn "Must provide a command (either #{COMMANDS.inspect})"
+  puts opts.to_s
+  exit
+rescue OptionParser::InvalidArgument
+  warn "Invalid option argument"
+  puts opts.to_s
+  exit
+rescue Twitter::Unauthorized
+  warn "Invalid authentication. Login with twt login user:pass"
+  exit
+end
