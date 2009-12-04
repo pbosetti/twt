@@ -1,0 +1,106 @@
+#!/usr/bin/env ruby
+#  untitled
+#
+#  Created by Paolo Bosetti on 2009-12-03.
+#  Copyright (c) 2009 University of Trento. All rights reserved.
+#
+require 'rubygems'
+require "twitter"
+require "optparse"
+require "yaml"
+require "pp"
+
+DATA_DIR = "#{ENV['HOME']}/.twitter"
+AUTH_FILE = "cfg.yaml"
+DEFAULT_COUNT = 10
+
+class Twt
+  def initialize
+    Dir.mkdir(DATA_DIR) unless Dir.exist?(DATA_DIR)
+    begin
+      @cfg = File.open("#{DATA_DIR}/#{AUTH_FILE}") { |file| YAML.load(file) } || Hash.new
+    rescue
+      @cfg = Hash.new
+    end
+  end
+  
+  def connect
+    httpauth = Twitter::HTTPAuth.new(@cfg[:user], @cfg[:pass])
+    @client = Twitter::Base.new(httpauth)
+  end
+  
+  def login(credentials)
+    credentials = credentials.split(":")
+    @cfg.merge!({:user=>credentials[0],:pass=>credentials[1]})
+    File.open("#{DATA_DIR}/#{AUTH_FILE}", "w") { |file| 
+      YAML.dump(@cfg, file)
+    }
+    self.connect
+    begin
+      @client.user_timeline
+      puts "Authorization succesfully completed."
+    rescue Twitter::Unauthorized
+      warn "Authorization error. Check User name and password."
+    end
+  end
+  
+  def timeline(kind, count)
+    self.connect
+    count = DEFAULT_COUNT unless count
+    puts "SHOWING LAST #{count} #{kind.to_s.upcase} MESSAGES:"
+    actual_timeline = @client.method("#{kind.to_s}_timeline".to_sym)
+    actual_timeline.call(:count=>count).reverse.each {|tweet|
+      head = "[#{tweet.user.screen_name}] "
+      text = tweet.text
+      puts "#{head}#{text}"
+      # pp tweet
+    }
+  end
+  
+  def post(msg)
+    self.connect
+    if msg.length >= 140 then
+      msg = msg[0...-3]+"..."
+      warn "your message has been shortened to 140 chars."
+    end
+    begin
+      @client.update(msg)
+      puts "Succesfully posted \"#{msg}\""
+    rescue
+      warn "Error posting your message.\n Error was: #{$!}"
+    end
+  end
+end
+
+class OptsError < Exception
+  
+end
+
+twt = Twt.new
+opts = OptionParser.new
+enough_opts = false
+
+begin
+  opts.on("-l=USER:PASS", "--login USER:PASS", "Save authorization", String) {|v|
+    enough_opts = true
+    twt.login(v)
+  }
+  opts.on("-f[COUNT]", "--friends[COUNT]", "Friends Timeline", Integer) {|v|
+    enough_opts = true
+    twt.timeline(:friends, v)
+  }
+  opts.on("-u[COUNT]", "--user[COUNT]", "User Timeline", Integer) {|v|
+    enough_opts = true
+    # v = DEFAULT_COUNT if v<1
+    twt.timeline(:user, v)
+  }
+  opts.on("-p MESSAGE", "--post MESSAGE", "Post a new message", String) {|v|
+    enough_opts = true
+    twt.post(v)
+  }
+  rest = opts.parse ARGV
+  warn "\nWarning: unused arguments: #{rest.inspect}\n" if rest.count > 0
+  raise OptsError unless enough_opts
+rescue OptsError
+  puts opts.to_s
+end
