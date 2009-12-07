@@ -69,6 +69,26 @@ At the moment, the following options are supported:
 - -wN: format messages to be nicely represented in a console of width N (sticky)
 - -r:  prints out results in raw format (useful for debug or Twitter API inspection)
 - -s:  toggles the insertion of an empty line between each result (sticky)
+- -p:  toggles between compact and readable view for tweet heading (sticky)
+- -kCOLOR: sets the color for tweet user name (sticky)
+
+Valid color codes are:
+
+- off       =>  Turn off all attributes
+- bright    =>  Set bright mode
+- underline =>  Set underline mode
+- blink     =>  Set blink mode
+- inverse   =>  Exchange foreground and background colors
+- hide      =>  Hide text (foreground color would be the same as background)
+- black     =>  Black text
+- red       =>  Red text
+- green     =>  Green text
+- yellow    =>  Yellow text
+- blue      =>  Blue text
+- magenta   =>  Magenta text
+- cyan      =>  Cyan text
+- white     =>  White text
+- default   =>  Default text color
 
 Example: this will read the latest 10 tweets from your friends, and this limit of ten messages will remain valid for every subsequent call, until modified or until a reset:
 

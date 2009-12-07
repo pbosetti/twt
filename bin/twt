@@ -20,6 +20,32 @@ class OptsError < Exception; end
 class CredentialsError < Exception; end
 
 class String
+  COLORS = {
+    :off     => 0 ,    # Turn off all attributes
+    :bright  => 1 ,    # Set bright mode
+    :underline => 4 ,    # Set underline mode
+    :blink   => 5 ,    # Set blink mode
+    :inverse => 7 ,    # Exchange foreground and background colors
+    :hide    => 8 ,    # Hide text (foreground color would be the same as background)
+    :black   => 30,    # Black text
+    :red     => 31,    # Red text
+    :green   => 32,    # Green text
+    :yellow  => 33,    # Yellow text
+    :blue    => 34,    # Blue text
+    :magenta => 35,    # Magenta text
+    :cyan    => 36,    # Cyan text
+    :white   => 37,    # White text
+    :default => 39,    # Default text color
+  }
+  
+  def color(fg, bg=nil)
+    raise ArgumentError, "Wrong text color #{fg}" unless COLORS[fg]
+    raise ArgumentError, "Wrong background color #{bg}" if bg and not COLORS[bg]
+    return self if fg == :off or fg == :default
+    bg_col = "\e[#{COLORS[bg]}m" if bg
+    "\e[#{COLORS[fg]}m#{bg_col}#{self}\e[0m"
+  end
+  
   def partition(w)
     if self.length <= w
       return [self]
@@ -32,13 +58,17 @@ end
 class Twt
   attr_accessor :raw
   def initialize
-    @raw = false
     Dir.mkdir(DATA_DIR) unless File.directory?(DATA_DIR)
     begin
       @cfg = File.open("#{DATA_DIR}/#{AUTH_FILE}") { |file| YAML.load(file) } || Hash.new
     rescue
       @cfg = Hash.new
     end
+    
+    @count  = (@cfg[:count] || 0)
+    @latest = (@cfg[:latest] || {})
+    @color  = (@cfg[:color].to_sym || :default)
+    @raw = false
   end
   
   def connect
@@ -82,15 +112,13 @@ class Twt
   
   def query(kind, user=nil)
     self.connect
-    count = (@cfg[:count] || 0)
-    latest = (@cfg[:latest] || {})
-    puts "SHOWING LAST #{count == 0 ? "UNREAD" : count} #{kind.to_s.upcase} MESSAGES:"
+    puts "SHOWING LAST #{@count == 0 ? "UNREAD" : @count} #{kind.to_s.upcase} MESSAGES:"
     actual_timeline = @client.method(kind.to_sym)
     call_arg = Hash.new
     if @cfg[:count] and @cfg[:count] > 0 then
-      call_arg = {:count=>count}
-    elsif latest[kind]
-      call_arg = {:since_id=>latest[kind]}
+      call_arg = {:count=>@count}
+    elsif @latest[kind]
+      call_arg = {:since_id=>@latest[kind]}
     end
     if user then
       call_arg[:id] = user
@@ -100,17 +128,24 @@ class Twt
       if @raw then
         pp tweet
       else
-        latest[kind.to_sym] = tweet.id
+        @latest[kind.to_sym] = tweet.id
         time = DateTime.parse(tweet.created_at)
-        timeshort = time.strftime("%m/%d %H:%M")
-        head = "[#{tweet.user.screen_name} #{timeshort}] "
-        text = tweet.text.partition((@cfg[:width] || DEFAULT_WIDTH)-head.length)
-        text = text*("\n"+" "*head.length)
+        if @cfg[:compact] then
+          timeshort = time.strftime("%m%d%H%M")
+          head = "#{tweet.user.screen_name.color(@color)}/#{timeshort} "
+          indent = (tweet.user.screen_name.length+timeshort.length+2)          
+        else
+          timeshort = time.strftime("%m/%d %H:%M")
+          head = "[#{tweet.user.screen_name.color(@color)} #{timeshort}] "
+          indent = (tweet.user.screen_name.length+timeshort.length+4)
+        end
+        text = tweet.text.partition((@cfg[:width] || DEFAULT_WIDTH)-indent)
+        text = text*("\n"+" "*indent)
         puts "#{head}#{text}"
         puts if @cfg[:space]
       end
     }
-    self.config = {:latest => latest}
+    self.config = {:latest => @latest}
   end
   
   def post(msg)
@@ -144,6 +179,12 @@ begin
   }
   opts.on("-s", "--space", "Toggle empty line between tweets (sticky)", TrueClass) {|v|
     twt.config = {:space => !twt.config[:space]}
+  }
+  opts.on("-p", "--compact", "Toggle compact heading (sticky)", TrueClass) {|v|
+    twt.config = {:compact => !twt.config[:compact]}
+  }
+  opts.on("-kCOLOR", "--color COLOR", "Set color for user names (sticky)", String) {|v|
+    twt.config = {:color => v}
   }
   
   rest = opts.parse ARGV
