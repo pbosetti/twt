@@ -67,7 +67,7 @@ class String
         buffer << w
       else
         result << buffer * " "
-        buffer = []
+        buffer = [w]
       end
     end
     result << buffer * " "
