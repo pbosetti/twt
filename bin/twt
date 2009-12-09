@@ -10,7 +10,7 @@ require "optparse"
 require "yaml"
 require "pp"
 
-VERSION = "0.1.3"
+VERSION = "0.1.4"
 PROGRAM_NAME = "Twt"
 DATA_DIR = "#{ENV['HOME']}/.twitter"
 AUTH_FILE = "cfg.yaml"
@@ -55,6 +55,25 @@ class String
       return [self[0...w], self[w..-1].partition(w)]
     end
   end
+  
+  def partition_by_words(width, color=:green)
+    words = self.split("\s")
+    result = []
+    buffer = []
+    words.each do |w|
+      if (buffer*" ").length + w.length < width then
+        w = w.color(color) if w =~ /@.*/
+        w = w.color(:underline) if w =~ /(http)(s*):\/\//
+        buffer << w
+      else
+        result << buffer * " "
+        buffer = []
+      end
+    end
+    result << buffer * " "
+    return result
+  end
+  
 end
 
 def warn(string)
@@ -149,7 +168,7 @@ class Twt
           head = "[#{tweet.user.screen_name.color(@color)} #{timeshort}] "
           indent = (tweet.user.screen_name.length+timeshort.length+4)
         end
-        text = tweet.text.partition((@cfg[:width] || DEFAULT_WIDTH)-indent)
+        text = tweet.text.partition_by_words((@cfg[:width] || DEFAULT_WIDTH)-indent, @color)
         text = text*("\n"+" "*indent)
         puts "#{head}#{text}"
         puts if @cfg[:space]

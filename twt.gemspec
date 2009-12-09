@@ -1,11 +1,11 @@
 
 Gem::Specification.new do |s|
   s.name = %q{twt}
-  s.version = "0.1.2"
+  s.version = "0.1.4"
  
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
-  s.authors = ["Paolo Bosetti (P4010)"]
-  s.date = %q{2009-12-04}
+  s.authors = ["Paolo Bosetti (@P4010)"]
+  s.date = %q{2009-12-08}
   s.default_executable = %q{twt}
   s.description = %q{twt is a command line interface (CLI) Twitter client. This version has colors!}
   s.email = %q{p4010@me.com}
