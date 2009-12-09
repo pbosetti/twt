@@ -10,6 +10,8 @@ require "optparse"
 require "yaml"
 require "pp"
 
+VERSION = "0.1.3"
+PROGRAM_NAME = "Twt"
 DATA_DIR = "#{ENV['HOME']}/.twitter"
 AUTH_FILE = "cfg.yaml"
 DEFAULT_COUNT = 10
@@ -55,6 +57,10 @@ class String
   end
 end
 
+def warn(string)
+  super(string.color(:red))
+end
+
 class Twt
   attr_accessor :raw
   def initialize
@@ -67,7 +73,7 @@ class Twt
     
     @count  = (@cfg[:count] || 0)
     @latest = (@cfg[:latest] || {})
-    @color  = (@cfg[:color].to_sym || :default)
+    @color  = (@cfg[:color] || :default).to_sym
     @raw = false
   end
   
@@ -88,7 +94,11 @@ class Twt
   end
   
   def reset
-    File.unlink("#{DATA_DIR}/#{AUTH_FILE}")
+    if File.exist?("#{DATA_DIR}/#{AUTH_FILE}") then
+      File.unlink("#{DATA_DIR}/#{AUTH_FILE}")
+    else
+      warn "Already reset"
+    end
   end
   
   def login(credentials)
@@ -186,10 +196,18 @@ begin
   opts.on("-kCOLOR", "--color COLOR", "Set color for user names (sticky)", String) {|v|
     twt.config = {:color => v}
   }
+  opts.on("-v", "--version", "Print program version") {
+    puts "twt version #{VERSION}"
+    exit
+  }
   
   rest = opts.parse ARGV
   CMD, ARG = rest
   raise OptsError unless COMMANDS.include?(CMD)
+  
+  if not File.exist?("#{DATA_DIR}/#{AUTH_FILE}") then
+    puts "Welcome! you're using twt version #{VERSION}.\nPlease drop a tweet to @P4010 if you like it!"
+  end
 
   case CMD
   when "login"
