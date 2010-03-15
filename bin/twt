@@ -16,7 +16,7 @@ DATA_DIR = "#{ENV['HOME']}/.twitter"
 AUTH_FILE = "cfg.yaml"
 DEFAULT_COUNT = 10
 DEFAULT_WIDTH = 80
-COMMANDS = %w|login logout post user friends mention reset|
+COMMANDS = %w|login logout post user friends mention delta reset|
 
 class OptsError < Exception; end
 class CredentialsError < Exception; end
@@ -190,6 +190,20 @@ class Twt
       warn "Error posting your message.\n Error was: #{$!}"
     end
   end
+  
+  def delta
+    self.connect
+    previous_ids = @cfg[:followers] || []
+    ids = @client.followers.map {|e| "@#{e.screen_name}: #{e.name}"}
+    difference_plus  = ids - previous_ids
+    difference_minus = previous_ids - ids
+    puts "Last time followers: #{previous_ids.size}\nNow you have #{ids.size} follower(s)"
+    print "New followers (#{difference_plus.size}):\n  "
+    puts difference_plus.size > 0 ? difference_plus.sort * "\n  " : "none"
+    print "Lost followers (#{difference_minus.size}):\n  "
+    puts difference_minus.size > 0 ? difference_minus.sort * "\n  " : "none"
+    self.config = {:followers => ids}
+  end
 end
 
 twt = Twt.new
@@ -241,6 +255,8 @@ begin
     twt.query(:friends_timeline)
   when "mention"
     twt.query(:mentions)
+  when "delta"
+    twt.delta
   when "reset"
     twt.reset
   end

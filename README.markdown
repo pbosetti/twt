@@ -55,6 +55,14 @@ To post a new message, issue:
 
 Note that twt will automatically cut your message down to 137 characters and add tree points at the end ("...") if your original message would result longer than 140 characters. You will be noticed about this shortening operation.
 
+Monitor your followers
+----------------------
+If you want to monitor your followers and discover the name of the last ugly people that left your list, use the delta command:
+
+    % twt delta
+    
+*This is new since version 0.1.5.*
+
 Reset the environment
 ---------------------
 twt keeps a few configuration variables (those marked as "sticky" in the short help) beside to the login in a hidden configuration file. If you want to reset to default values (and clean login information too), issue:
