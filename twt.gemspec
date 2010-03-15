@@ -5,7 +5,7 @@ Gem::Specification.new do |s|
  
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Paolo Bosetti (@P4010)"]
-  s.date = %q{2010-15-03}
+  s.date = %q{2010-03-15}
   s.default_executable = %q{twt}
   s.description = %q{twt is a command line interface (CLI) Twitter client. Now you can monitor your followers!}
   s.email = %q{p4010@me.com}
