@@ -10,7 +10,7 @@ require "optparse"
 require "yaml"
 require "pp"
 
-VERSION = "0.1.5"
+VERSION = "0.1.6"
 PROGRAM_NAME = "Twt"
 DATA_DIR = "#{ENV['HOME']}/.twitter"
 AUTH_FILE = "cfg.yaml"
