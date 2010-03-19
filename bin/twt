@@ -10,13 +10,13 @@ require "optparse"
 require "yaml"
 require "pp"
 
-VERSION = "0.1.6"
+VERSION = "0.2.0"
 PROGRAM_NAME = "Twt"
 DATA_DIR = "#{ENV['HOME']}/.twitter"
 AUTH_FILE = "cfg.yaml"
 DEFAULT_COUNT = 10
 DEFAULT_WIDTH = 80
-COMMANDS = %w|login logout post user friends mention delta reset|
+COMMANDS = %w|login logout post user friends mention delta reset queue dequeue deliver|
 
 class OptsError < Exception; end
 class CredentialsError < Exception; end
@@ -140,8 +140,8 @@ class Twt
   end
   
   def query(kind, user=nil)
-    self.connect
     puts "SHOWING LAST #{@count == 0 ? "UNREAD" : @count} #{kind.to_s.upcase} MESSAGES:"
+    self.connect 
     actual_timeline = @client.method(kind.to_sym)
     call_arg = Hash.new
     if @cfg[:count] and @cfg[:count] > 0 then
@@ -152,7 +152,16 @@ class Twt
     if user then
       call_arg[:id] = user
     end
-    tweets = actual_timeline.call(call_arg).reverse
+    begin
+      tweets = actual_timeline.call(call_arg).reverse
+    rescue SocketError
+      warn "Connection error. Perhaps you're not connected to the Internet?"
+      return
+    rescue
+      warn "Unknown error during connection with Twitter. Error was:"
+      puts $!
+      return
+    end
     tweets.each {|tweet|
       if @raw then
         pp tweet
@@ -178,16 +187,67 @@ class Twt
   end
   
   def post(msg)
-    self.connect
     if msg.length >= 140 then
       msg = msg[0...-3]+"..."
       warn "your message has been shortened to 140 chars."
     end
     begin
+      self.connect
       @client.update(msg)
       puts "Succesfully posted \"#{msg}\""
+    rescue SocketError
+      warn "Error posting your message. Perhaps you're not connected to the Internet?"
+      queue = @cfg[:queue] || []
+      queue << msg
+      self.config = {:queue => queue}
+      puts "Your message has been queued. Issue 'twt deliver' next time you go online"
     rescue
-      warn "Error posting your message.\n Error was: #{$!}"
+      warn "Unknown error during connection with Twitter. Error was:"
+      puts $!
+    end
+  end
+  
+  def queue
+    if @cfg[:queue] and not @cfg[:queue].empty?   
+      @cfg[:queue].each_with_index do |m,i|
+        puts "#{i}. #{m}"
+      end
+    else
+      puts "Message queue is empty"
+    end
+  end
+  
+  def dequeue(list=[])
+    if list.empty?
+      self.config = {:queue => []} 
+      puts "Message queue is now empty"
+    else
+      queue = @cfg[:queue] || []
+      list.map! {|e| e.to_i}
+      list.reject! {|i| i >= queue.length}
+      self.config = {:queue => queue-queue.values_at(*list)}
+      puts "Messages #{list * ", "} dequeued"
+    end
+  end
+  
+  def deliver
+    begin
+      self.connect
+      @client.mentions
+    rescue SocketError
+      warn "Still not connected, unable to deliver. Messages remain in queue."
+      return
+    end
+    if @cfg[:queue] and not @cfg[:queue].empty?
+      puts "Delivering #{@cfg[:queue].length} queued messages:"
+      @cfg[:queue].each_with_index do |m,i|
+        print "message #{i}... "
+        self.post m
+        puts "sent"
+      end
+      self.dequeue
+    else
+      puts "Message queue is empty, cannot deliver"
     end
   end
   
@@ -208,7 +268,7 @@ end
 
 twt = Twt.new
 opts = OptionParser.new
-opts.banner = "Usage: twt [options] #{COMMANDS*'|'} [argument]\nArguments are:"
+opts.banner = "Usage: twt [options] #{COMMANDS*'|'} [argument]\nOptions are:"
 
 begin
   opts.on("-cCOUNT", "--count COUNT", "Messages to get (sticky)", Integer) {|v|
@@ -235,7 +295,8 @@ begin
   }
   
   rest = opts.parse ARGV
-  CMD, ARG = rest
+  CMD = rest.shift
+  ARG = rest[0]
   raise OptsError unless COMMANDS.include?(CMD)
   
   if not File.exist?("#{DATA_DIR}/#{AUTH_FILE}") then
@@ -255,10 +316,10 @@ begin
     twt.query(:friends_timeline)
   when "mention"
     twt.query(:mentions)
-  when "delta"
-    twt.delta
-  when "reset"
-    twt.reset
+  when "dequeue"
+    twt.dequeue(rest)
+  else
+    twt.send CMD if twt.respond_to? CMD
   end
 rescue OptsError
   warn "Must provide a command (either #{COMMANDS.inspect})"

@@ -55,6 +55,29 @@ To post a new message, issue:
 
 Note that twt will automatically cut your message down to 137 characters and add tree points at the end ("...") if your original message would result longer than 140 characters. You will be noticed about this shortening operation.
 
+*NEW in ver. 0.2!* If you are not connected to the Internet when you post a message, the message will be queued. You can view and manipulate your queued messages with the command:
+
+    % twt queue
+    0. test1
+    1. test2
+    2. test3
+    % twt dequeue 0 2           # deletes messages 0 and 2 from the queue
+    Messages 0, 2 dequeued
+    % twt dequeue               # deletes all the queued messages
+    Message queue is now empty
+
+When you go back online, you can then deliver all the queued messages with the command:
+
+    % twt deliver
+    Delivering 3 queued messages:
+    message 0... Succesfully posted "test1"
+    sent
+    message 1... Succesfully posted "test2"
+    sent
+    message 2... Succesfully posted "test3"
+    sent
+    Message queue is now empty
+    
 Monitor your followers
 ----------------------
 If you want to monitor your followers and discover the name of the last ugly people that left your list, use the delta command:
