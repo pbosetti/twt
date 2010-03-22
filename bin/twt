@@ -10,13 +10,15 @@ require "optparse"
 require "yaml"
 require "pp"
 
-VERSION = "0.2.0"
+TWT_VERSION = "0.2.0"
 PROGRAM_NAME = "Twt"
 DATA_DIR = "#{ENV['HOME']}/.twitter"
 AUTH_FILE = "cfg.yaml"
 DEFAULT_COUNT = 10
 DEFAULT_WIDTH = 80
-COMMANDS = %w|login logout post user friends mention delta reset queue dequeue deliver|
+COMMANDS = %w|logout post user friends mention delta reset queue dequeue deliver|
+CTOKEN = "j70epTwp5ogCOPjVTtcYQ"
+CSECRET = "IamMBM0F581hpOIsnnXt7exhGuHJCn3oP6F2SwOvI"
 
 class OptsError < Exception; end
 class CredentialsError < Exception; end
@@ -97,8 +99,22 @@ class Twt
   end
   
   def connect
-    httpauth = Twitter::HTTPAuth.new(@cfg[:user], @cfg[:pass])
-    @client = Twitter::Base.new(httpauth)
+    oauth = Twitter::OAuth.new(CTOKEN, CSECRET)
+    if @cfg[:asecret] and @cfg[:atoken]
+      oauth.authorize_from_access(@cfg[:atoken], @cfg[:asecret])
+    else
+      rtoken  = oauth.request_token.token
+      rsecret = oauth.request_token.secret
+     
+      puts "> redirecting you to twitter to authorize..."
+      %x(open #{oauth.request_token.authorize_url})
+     
+      print "> what was the PIN twitter provided you with? "
+      pin = STDIN.gets.chomp
+      oauth.authorize_from_request(rtoken, rsecret, pin)
+      self.config = {:atoken => oauth.access_token.token, :asecret => oauth.access_token.secret}
+    end
+    @client = Twitter::Base.new(oauth)
   end
   
   def config=(h)
@@ -120,23 +136,8 @@ class Twt
     end
   end
   
-  def login(credentials)
-    credentials = credentials.split(":")
-    begin
-      raise CredentialsError unless credentials.size == 2
-      self.config = {:user=>credentials[0],:pass=>credentials[1]}
-      self.connect
-      @client.user_timeline
-      puts "Authorization succesfully completed."
-    rescue Twitter::Unauthorized
-      warn "Authorization error. Check User name and password."
-    rescue CredentialsError
-      warn "Login format error: Login with twt login USER:PASS"
-    end
-  end
-  
   def logout
-    self.config = {:user=>"",:pass=>""}
+    self.config = {:atoken=>nil,:asecret=>nil}
   end
   
   def query(kind, user=nil)
@@ -290,7 +291,7 @@ begin
     twt.config = {:color => v}
   }
   opts.on("-v", "--version", "Print program version") {
-    puts "twt version #{VERSION}"
+    puts "twt version #{TWT_VERSION}"
     exit
   }
   
@@ -300,12 +301,10 @@ begin
   raise OptsError unless COMMANDS.include?(CMD)
   
   if not File.exist?("#{DATA_DIR}/#{AUTH_FILE}") then
-    puts "Welcome! you're using twt version #{VERSION}.\nPlease drop a tweet to @P4010 if you like it!"
+    puts "Welcome! you're using twt version #{TWT_VERSION}.\nPlease drop a tweet to @P4010 if you like it!"
   end
 
   case CMD
-  when "login"
-    twt.login(ARG)
   when "logout"
     twt.logout
   when "post"

@@ -4,7 +4,9 @@ twt is a Twitter client designed to be as easy as possible to be used from CLI. 
 
 Installation
 ============
-You need a working Ruby environment. On Linux and OS X, the default ruby 1.8.7 is OK (but if you want Ruby 1.9.2 is OK too).
+You need a working Ruby environment. On Linux and OS X, the default ruby 1.8.7 is OK.
+
+*NOTE:* due to a bug in oauth gem, currently twt cannot post when used under ruby 1.9.x. I'll hope to fix that soon (either with a workaround or by waiting for a solution from oauth guys).
 
 Then you have to install twt via rubygems:
 
@@ -22,11 +24,8 @@ A short guide appears if you type:
 
 Login
 -----
-Provided that your Twitter username and password are USER and PWD, respectively, you first have to login by issuing the command:
-
-    % twt login USER:PWD
-
-The command tells you if the login was successful or not, then exits. The login information gets actually saved on a hidden file, available for any subsequent request until logout (see next).
+This version relies on OAuth for authentication. This means that the very first time you try to do something, twt will launch your browser and ask Twitter for connection. You have to confirm the request (within the browser), copy the PIN it gives you back, and past the PIN after the prompt that twt is presenting you.
+Since now, you are connected and each subsequent command would not require additional authentication, until you would logout.
 
 Logout
 ------
