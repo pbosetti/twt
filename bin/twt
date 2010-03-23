@@ -9,8 +9,10 @@ require "twitter"
 require "optparse"
 require "yaml"
 require "pp"
+require "json"
 
 TWT_VERSION = "0.2.0"
+VERSION_CHECK_PERIOD = 3600 * 24
 PROGRAM_NAME = "Twt"
 DATA_DIR = "#{ENV['HOME']}/.twitter"
 AUTH_FILE = "cfg.yaml"
@@ -118,10 +120,10 @@ class Twt
       rtoken  = oauth.request_token.token
       rsecret = oauth.request_token.secret
      
-      puts "> redirecting you to twitter to authorize..."
+      print "Redirecting you to twitter to authorize...\n"
       %x(open #{oauth.request_token.authorize_url})
      
-      print "> what was the PIN twitter provided you with? "
+      print "what was the PIN twitter provided you with?\n> "
       pin = STDIN.gets.chomp
       oauth.authorize_from_request(rtoken, rsecret, pin)
       self.config = {:atoken => oauth.access_token.token, :asecret => oauth.access_token.secret}
@@ -277,6 +279,24 @@ class Twt
     puts difference_minus.size > 0 ? difference_minus.sort * "\n  " : "none"
     self.config = {:followers => ids}
   end
+  
+  def check_version
+    self.config = {:last_version_check => Time.now} unless @cfg[:last_version_check]
+    if (Time.now - @cfg[:last_version_check]) > VERSION_CHECK_PERIOD
+      gemcutter_response = Net::HTTP.get_response("rubygems.org","/api/v1/gems/twt.json")
+      current_version = JSON.parse(gemcutter_response.body)["version"]
+      self.config = {:last_version_check => Time.now}
+      return version_hash(current_version) > version_hash(TWT_VERSION)
+    else
+      return false
+    end
+  end
+  
+  def version_hash(string)
+    c = string.split(".")
+    return c[0]*10_000 + c[1]*100 + c[2]
+  end
+  private :version_hash
 end
 
 twt = Twt.new
@@ -331,6 +351,10 @@ begin
     twt.dequeue(rest)
   else
     twt.send CMD if twt.respond_to? CMD
+  end
+  
+  if twt.check_version then
+    warn "New twt version is available.\nUpdate with \"gem update twt\""
   end
 rescue OptsError
   warn "Must provide a command (either #{COMMANDS.inspect})"
