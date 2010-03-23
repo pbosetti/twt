@@ -23,6 +23,18 @@ CSECRET = "IamMBM0F581hpOIsnnXt7exhGuHJCn3oP6F2SwOvI"
 class OptsError < Exception; end
 class CredentialsError < Exception; end
 
+if RUBY_VERSION =~ /^1\.9/
+  module Net
+    module HTTPHeader
+      def urlencode(str)
+        str = str.to_s
+        str.dup.force_encoding('ASCII-8BIT').gsub(/[^a-zA-Z0-9_\.\-]/){'%%%02x' % $&.ord}
+      end
+      private :urlencode
+    end
+  end
+end
+
 class String
   COLORS = {
     :off     => 0 ,    # Turn off all attributes

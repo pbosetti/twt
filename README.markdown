@@ -4,9 +4,7 @@ twt is a Twitter client designed to be as easy as possible to be used from CLI. 
 
 Installation
 ============
-You need a working Ruby environment. On Linux and OS X, the default ruby 1.8.7 is OK.
-
-*NOTE:* due to a bug in oauth gem, currently twt cannot post when used under ruby 1.9.x. I'll hope to fix that soon (either with a workaround or by waiting for a solution from oauth guys).
+You need a working Ruby environment. On Linux and OS X, the default ruby 1.8.7 is OK, and it also work with Ruby 1.9.x
 
 Then you have to install twt via rubygems:
 
