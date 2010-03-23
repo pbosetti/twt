@@ -14,6 +14,8 @@ This will also install a few dependencies.
 
 If you are on Windows, well, just try and let me know if it works.
 
+Since version 0.2.1, twt checks online for new version availability. If found, it remembers you to upgrade your gem.
+
 Usage
 =====
 A short guide appears if you type:
