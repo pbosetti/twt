@@ -11,7 +11,7 @@ require "yaml"
 require "pp"
 require "json"
 
-TWT_VERSION = "0.2.0"
+TWT_VERSION = "0.2.1"
 VERSION_CHECK_PERIOD = 3600 * 24
 PROGRAM_NAME = "Twt"
 DATA_DIR = "#{ENV['HOME']}/.twitter"
