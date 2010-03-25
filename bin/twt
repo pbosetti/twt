@@ -320,7 +320,11 @@ begin
     twt.config = {:compact => !twt.config[:compact]}
   }
   opts.on("-kCOLOR", "--color COLOR", "Set color for user names (sticky)", String) {|v|
-    twt.config = {:color => v}
+    if String::COLORS.include? v.to_sym
+      twt.config = {:color => v}
+    else
+      warn "Supported colors are:\n#{String::COLORS.keys * ", "}.\nNo change has been made."
+    end
   }
   opts.on("-v", "--version", "Print program version") {
     puts "twt version #{TWT_VERSION}"
