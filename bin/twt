@@ -11,7 +11,7 @@ require "yaml"
 require "pp"
 require "json"
 
-TWT_VERSION = "0.2.1"
+TWT_VERSION = "0.2.3"
 VERSION_CHECK_PERIOD = 3600 * 24
 PROGRAM_NAME = "Twt"
 DATA_DIR = "#{ENV['HOME']}/.twitter"
@@ -285,8 +285,9 @@ class Twt
     if (Time.now - @cfg[:last_version_check]) > VERSION_CHECK_PERIOD
       gemcutter_response = Net::HTTP.get_response("rubygems.org","/api/v1/gems/twt.json")
       current_version = JSON.parse(gemcutter_response.body)["version"]
-      self.config = {:last_version_check => Time.now}
-      return version_hash(current_version) > version_hash(TWT_VERSION)
+      must_upgrade = version_hash(current_version) > version_hash(TWT_VERSION)
+      self.config = {:last_version_check => Time.now} unless must_upgrade
+      return must_upgrade
     else
       return false
     end
