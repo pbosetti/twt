@@ -11,14 +11,14 @@ require "yaml"
 require "pp"
 require "json"
 
-TWT_VERSION = "0.2.3"
+TWT_VERSION = "0.2.4"
 VERSION_CHECK_PERIOD = 3600 * 24
 PROGRAM_NAME = "Twt"
 DATA_DIR = "#{ENV['HOME']}/.twitter"
 AUTH_FILE = "cfg.yaml"
 DEFAULT_COUNT = 10
 DEFAULT_WIDTH = 80
-COMMANDS = %w|logout post user friends mention delta reset queue dequeue deliver|
+COMMANDS = %w|logout post user friends mention delta reset queue dequeue deliver follow unfollow|
 CTOKEN = "j70epTwp5ogCOPjVTtcYQ"
 CSECRET = "IamMBM0F581hpOIsnnXt7exhGuHJCn3oP6F2SwOvI"
 
@@ -90,6 +90,9 @@ class String
     return result
   end
   
+  def human
+    self.upcase.sub(/_/, ' ')
+  end
 end
 
 def warn(string)
@@ -155,7 +158,7 @@ class Twt
   end
   
   def query(kind, user=nil)
-    puts "SHOWING LAST #{@count == 0 ? "UNREAD" : @count} #{kind.to_s.upcase} MESSAGES:"
+    puts "SHOWING LAST #{@count == 0 ? "UNREAD" : @count} #{kind.to_s.human} MESSAGES:"
     self.connect 
     actual_timeline = @client.method(kind.to_sym)
     call_arg = Hash.new
@@ -203,8 +206,11 @@ class Twt
   
   def post(msg)
     if msg.length >= 140 then
-      msg = msg[0...-3]+"..."
-      warn "your message has been shortened to 140 chars."
+      msg = msg[0...137]+"..."
+      warn "your message has been shortened to 140 chars. Send anyway [Y/n]?"
+      reply = STDIN.getc.upcase
+      return if reply.upcase == 'N'
+      puts "sending #{msg.length}"
     end
     begin
       self.connect
@@ -287,12 +293,30 @@ class Twt
       current_version = JSON.parse(gemcutter_response.body)["version"]
       must_upgrade = version_hash(current_version) > version_hash(TWT_VERSION)
       self.config = {:last_version_check => Time.now} unless must_upgrade
-      return must_upgrade
+      return [must_upgrade, current_version]
     else
-      return false
+      return [false, current_version]
     end
   end
   
+  def following(action, who)
+    self.connect
+    who.each do |user|
+      begin
+        case action
+        when :add
+          result = @client.friendship_create(user)
+          puts "You are now following #{user.color(@color)}'s updates"
+        when :remove
+          result = @client.friendship_destroy(user)
+          puts "You are no more following #{user.color(@color)}'s updates"
+        end
+      rescue
+        warn "Error in #{action == :add ? 'following' : 'unfollowing'} #{user.color(@color)}: #{$!}"
+      end
+    end  
+  end
+    
   def version_hash(string)
     c = string.split(".")
     return c[0]*10_000 + c[1]*100 + c[2]
@@ -354,12 +378,16 @@ begin
     twt.query(:mentions)
   when "dequeue"
     twt.dequeue(rest)
+  when "follow"
+    twt.following(:add, rest)
+  when "unfollow"
+    twt.following(:remove, rest)
   else
-    twt.send CMD if twt.respond_to? CMD
+    twt.send(CMD, ARG) if twt.respond_to? CMD
   end
   
-  if twt.check_version then
-    warn "New twt version is available.\nUpdate with \"gem update twt\""
+  if twt.check_version[0] then
+    warn "New twt version (#{twt.check_version[1]}) is available. You are currently using version #{TWT_VERSION}.\nUpdate with \"gem update twt\""
   end
 rescue OptsError
   warn "Must provide a command (either #{COMMANDS.inspect})"

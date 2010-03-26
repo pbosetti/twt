@@ -33,7 +33,7 @@ If you want to remove your credentials, just type:
     
     % twt logout
     
-Read friends of user timelines
+Read friends or user timelines
 ------------------------------
 
 To read you friends timeline, your own timeline, and the tweets mentioning you, simply issue:
@@ -84,6 +84,16 @@ If you want to monitor your followers and discover the name of the last ugly peo
     % twt delta
     
 *This is new since version 0.1.5.*
+
+Follower management
+-------------------
+You can add one or more users by means of the following command:
+
+    % twt follow oneuser anotheruser
+    
+In the same way, to stop following a given user is a matter of:
+    
+    % twt unfollow annoyinguser
 
 Reset the environment
 ---------------------
