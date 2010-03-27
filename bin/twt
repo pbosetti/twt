@@ -11,7 +11,7 @@ require "yaml"
 require "pp"
 require "json"
 
-TWT_VERSION = "0.2.4"
+TWT_VERSION = "0.2.5"
 VERSION_CHECK_PERIOD = 3600 * 24
 PROGRAM_NAME = "Twt"
 DATA_DIR = "#{ENV['HOME']}/.twitter"
@@ -145,7 +145,7 @@ class Twt
     @cfg
   end
   
-  def reset
+  def reset(*args)
     if File.exist?("#{DATA_DIR}/#{AUTH_FILE}") then
       File.unlink("#{DATA_DIR}/#{AUTH_FILE}")
     else
@@ -153,7 +153,7 @@ class Twt
     end
   end
   
-  def logout
+  def logout(*args)
     self.config = {:atoken=>nil,:asecret=>nil}
   end
   
@@ -228,7 +228,7 @@ class Twt
     end
   end
   
-  def queue
+  def queue(*args)
     if @cfg[:queue] and not @cfg[:queue].empty?   
       @cfg[:queue].each_with_index do |m,i|
         puts "#{i}. #{m}"
@@ -251,7 +251,7 @@ class Twt
     end
   end
   
-  def deliver
+  def deliver(*args)
     begin
       self.connect
       @client.mentions
@@ -272,7 +272,7 @@ class Twt
     end
   end
   
-  def delta
+  def delta(*args)
     self.connect
     previous_ids = @cfg[:followers] || []
     ids = @client.followers.map {|e| "@#{e.screen_name}: #{e.name}"}
