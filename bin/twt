@@ -205,6 +205,10 @@ class Twt
   end
   
   def post(msg)
+    if msg == nil or msg.length == 0 then
+      warn "Tweet text must not be empty"
+      return
+    end
     if msg.length >= 140 then
       msg = msg[0...137]+"..."
       warn "your message has been shortened to 140 chars. Send anyway [Y/n]?"
