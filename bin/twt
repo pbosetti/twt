@@ -11,7 +11,7 @@ require "yaml"
 require "pp"
 require "json"
 
-TWT_VERSION = "0.2.5"
+TWT_VERSION = "0.2.6"
 VERSION_CHECK_PERIOD = 3600 * 24
 PROGRAM_NAME = "Twt"
 DATA_DIR = "#{ENV['HOME']}/.twitter"
@@ -122,14 +122,24 @@ class Twt
     else
       rtoken  = oauth.request_token.token
       rsecret = oauth.request_token.secret
-     
+      url     = oauth.request_token.authorize_url
       print "Redirecting you to twitter to authorize...\n"
-      %x(open #{oauth.request_token.authorize_url})
+      case RUBY_PLATFORM
+      when /darwin/
+        system "open \"#{url}\""
+      when /mswin/
+        system "start #{url}"
+      else
+        puts "open #{url} in your preferred browser"
+      end
      
       print "what was the PIN twitter provided you with?\n> "
       pin = STDIN.gets.chomp
       oauth.authorize_from_request(rtoken, rsecret, pin)
-      self.config = {:atoken => oauth.access_token.token, :asecret => oauth.access_token.secret}
+      self.config = {
+        :atoken => oauth.access_token.token, 
+        :asecret => oauth.access_token.secret
+      }
     end
     @client = Twitter::Base.new(oauth)
   end
@@ -211,7 +221,8 @@ class Twt
     end
     if msg.length >= 140 then
       msg = msg[0...137]+"..."
-      warn "your message has been shortened to 140 chars. Send anyway [Y/n]?"
+      msg_short = msg.partition_by_words((@cfg[:width] || DEFAULT_WIDTH)-4, @color) * ("\n"+" "*4)
+      warn "your message has been shortened to 140 chars:\n    #{msg_short}\nSend anyway [Y/n]?"
       reply = STDIN.getc.upcase
       return if reply.upcase == 'N'
       puts "sending #{msg.length}"
