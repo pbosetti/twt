@@ -11,7 +11,7 @@ require "yaml"
 require "pp"
 require "json"
 
-TWT_VERSION = "0.2.6"
+TWT_VERSION = "0.2.7"
 VERSION_CHECK_PERIOD = 3600 * 24
 PROGRAM_NAME = "Twt"
 DATA_DIR = "#{ENV['HOME']}/.twitter"
@@ -290,7 +290,7 @@ class Twt
   def delta(*args)
     self.connect
     previous_ids = @cfg[:followers] || []
-    ids = @client.followers.map {|e| "@#{e.screen_name}: #{e.name}"}
+    ids = @client.followers.map {|e| "@#{e.screen_name.downcase}: #{e.name}"}
     difference_plus  = ids - previous_ids
     difference_minus = previous_ids - ids
     puts "Last time followers: #{previous_ids.size}\nNow you have #{ids.size} follower(s)"
