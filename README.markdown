@@ -76,7 +76,15 @@ When you go back online, you can then deliver all the queued messages with the c
     message 2... Succesfully posted "test3"
     sent
     Message queue is now empty
+
+*NEW in ver. 0.3!* Direct messages (DMs) are supported. To send a direct message to @user, just type:
+
+    % twt dm @user "message test"
     
+In order to read the list of your direct messages, just issue:
+
+    % twt dms
+
 Monitor your followers
 ----------------------
 If you want to monitor your followers and discover the name of the last ugly people that left your list, use the delta command:

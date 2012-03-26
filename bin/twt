@@ -6,21 +6,24 @@
 #
 require 'rubygems'
 require "twitter"
+require "oauth"
 require "optparse"
 require "yaml"
 require "pp"
 require "json"
 
-TWT_VERSION = "0.2.7"
-VERSION_CHECK_PERIOD = 3600 * 24
+TWT_VERSION = "0.3.4"
+VERSION_CHECK_PERIOD = 3600 * 8
 PROGRAM_NAME = "Twt"
 DATA_DIR = "#{ENV['HOME']}/.twitter"
 AUTH_FILE = "cfg.yaml"
 DEFAULT_COUNT = 10
 DEFAULT_WIDTH = 80
-COMMANDS = %w|logout post user friends mention delta reset queue dequeue deliver follow unfollow|
-CTOKEN = "j70epTwp5ogCOPjVTtcYQ"
-CSECRET = "IamMBM0F581hpOIsnnXt7exhGuHJCn3oP6F2SwOvI"
+COMMANDS = %w|logout post dm dms user friends mention delta reset queue dequeue deliver follow unfollow|
+pts =<<EOD
+126 75 68 121 132 104 139 132 73 131 123 87 99 100 126 106 104 136 119 109 101 93 117 129 97 86 97 68 90 73 76 69 124 132 99 93 135 130 130 108 136 75 121 140 124 91 137 92 94 87 130 71 131 100 74 90 70 103 139 99 138 93
+EOD
+UAO = pts.split.map {|b| b.to_i-20}.pack("c62")
 
 class OptsError < Exception; end
 class CredentialsError < Exception; end
@@ -116,13 +119,10 @@ class Twt
   end
   
   def connect
-    oauth = Twitter::OAuth.new(CTOKEN, CSECRET)
-    if @cfg[:asecret] and @cfg[:atoken]
-      oauth.authorize_from_access(@cfg[:atoken], @cfg[:asecret])
-    else
-      rtoken  = oauth.request_token.token
-      rsecret = oauth.request_token.secret
-      url     = oauth.request_token.authorize_url
+    consumer = OAuth::Consumer.new(UAO[0..20], UAO[21..-1],{ :site => "http://api.twitter.com", :scheme => :header })
+    unless (@cfg[:asecret] and @cfg[:atoken])
+      request_token = consumer.get_request_token(:oauth_callback => "oob")
+      url     = request_token.authorize_url(:oauth_callback => "oob")
       print "Redirecting you to twitter to authorize...\n"
       case RUBY_PLATFORM
       when /darwin/
@@ -135,13 +135,19 @@ class Twt
      
       print "what was the PIN twitter provided you with?\n> "
       pin = STDIN.gets.chomp
-      oauth.authorize_from_request(rtoken, rsecret, pin)
+      access_token = consumer.get_access_token(request_token, :oauth_verifier => pin)
       self.config = {
-        :atoken => oauth.access_token.token, 
-        :asecret => oauth.access_token.secret
+        :atoken => access_token.token, 
+        :asecret => access_token.secret
       }
     end
-    @client = Twitter::Base.new(oauth)
+    Twitter.configure do |config|
+      config.consumer_key = UAO[0..20]
+      config.consumer_secret = UAO[21..-1]
+      config.oauth_token = @cfg[:atoken]
+      config.oauth_token_secret = @cfg[:asecret]
+    end
+    @client = Twitter::Client.new
   end
   
   def config=(h)
@@ -195,15 +201,16 @@ class Twt
         pp tweet
       else
         @latest[kind.to_sym] = tweet.id
-        time = DateTime.parse(tweet.created_at)
+        time = tweet.created_at
+        user = (kind == :direct_messages ? tweet.sender : tweet.user)
         if @cfg[:compact] then
           timeshort = time.strftime("%m%d%H%M")
-          head = "#{tweet.user.screen_name.color(@color)}/#{timeshort} "
-          indent = (tweet.user.screen_name.length+timeshort.length+2)          
+          head = "#{user.screen_name.color(@color)}/#{timeshort} "
+          indent = (user.screen_name.length+timeshort.length+2)          
         else
           timeshort = time.strftime("%m/%d %H:%M")
-          head = "[#{tweet.user.screen_name.color(@color)} #{timeshort}] "
-          indent = (tweet.user.screen_name.length+timeshort.length+4)
+          head = "[#{user.screen_name.color(@color)} #{timeshort}] "
+          indent = (user.screen_name.length+timeshort.length+4)
         end
         text = tweet.text.partition_by_words((@cfg[:width] || DEFAULT_WIDTH)-indent, @color)
         text = text*("\n"+" "*indent)
@@ -242,6 +249,43 @@ class Twt
       puts $!
     end
   end
+  
+  def dm(args)
+    name, msg = args
+    begin
+      id = Twitter.user(name).id
+    rescue Twitter::Error::NotFound
+      warn "Check user name: @#{name} not found."
+    end
+    if msg == nil or msg.length == 0 then
+      warn "Tweet text must not be empty"
+      return
+    end
+    if msg.length >= 140 then
+      msg = msg[0...137]+"..."
+      msg_short = msg.partition_by_words((@cfg[:width] || DEFAULT_WIDTH)-4, @color) * ("\n"+" "*4)
+      warn "your message has been shortened to 140 chars:\n    #{msg_short}\nSend anyway [Y/n]?"
+      reply = STDIN.getc.upcase
+      return if reply.upcase == 'N'
+      puts "sending #{msg.length}"
+    end
+    begin
+      self.connect
+      puts "sending #{msg} to #{id} "
+      @client.direct_message_create(id, msg)
+      puts "Succesfully posted \"#{msg}\" to user @#{name} (#{id})"
+    rescue SocketError
+      warn "Error posting your message. Perhaps you're not connected to the Internet?"
+      queue = @cfg[:queue] || []
+      queue << msg
+      self.config = {:queue => queue}
+      puts "Your message has been queued. Issue 'twt deliver' next time you go online"
+    rescue
+      warn "Unknown error during connection with Twitter. Error was:"
+      puts $!
+    end
+  end
+  
   
   def queue(*args)
     if @cfg[:queue] and not @cfg[:queue].empty?   
@@ -290,15 +334,34 @@ class Twt
   def delta(*args)
     self.connect
     previous_ids = @cfg[:followers] || []
-    ids = @client.followers.map {|e| "@#{e.screen_name.downcase}: #{e.name}"}
+    ids = @client.follower_ids.ids
     difference_plus  = ids - previous_ids
     difference_minus = previous_ids - ids
     puts "Last time followers: #{previous_ids.size}\nNow you have #{ids.size} follower(s)"
     print "New followers (#{difference_plus.size}):\n  "
-    puts difference_plus.size > 0 ? difference_plus.sort * "\n  " : "none"
+    puts difference_plus.size > 0 ? ids_to_names(difference_plus) * "\n  " : "none"
     print "Lost followers (#{difference_minus.size}):\n  "
-    puts difference_minus.size > 0 ? difference_minus.sort * "\n  " : "none"
+    puts difference_minus.size > 0 ? ids_to_names(difference_minus) * "\n  " : "none"
     self.config = {:followers => ids}
+  rescue   Twitter::Error::BadRequest
+    warn "Rate limit exceeded. Try again later"
+  rescue
+    puts $!
+  end
+  
+  def ids_to_names(ary)
+    ary.map {|e|
+      user = Twitter.user(e) 
+      "@#{user.screen_name.downcase}: #{user.name}"
+      }.sort
+  rescue Twitter::Error::ServiceUnavailable
+    warn "Twitter is over capacity. Try again later"
+    return []
+  rescue Twitter::Error::BadRequest
+    warn "Rate limit exceeded. Try again later"
+    return []
+  rescue
+    puts $!
   end
   
   def check_version
@@ -373,7 +436,7 @@ begin
   
   rest = opts.parse ARGV
   CMD = rest.shift
-  ARG = rest[0]
+  ARG = rest
   raise OptsError unless COMMANDS.include?(CMD)
   
   if not File.exist?("#{DATA_DIR}/#{AUTH_FILE}") then
@@ -384,11 +447,15 @@ begin
   when "logout"
     twt.logout
   when "post"
-    twt.post(ARG)
+    twt.post(ARG[0])
+  when "dm"
+    twt.dm(ARG)
+  when "dms"
+    twt.query(:direct_messages)
   when "user"
-    twt.query(:user_timeline, ARG)
+    twt.query(:user_timeline, ARG[0])
   when "friends"
-    twt.query(:friends_timeline)
+    twt.query(:home_timeline)
   when "mention"
     twt.query(:mentions)
   when "dequeue"
@@ -412,7 +479,7 @@ rescue OptionParser::InvalidArgument
   warn "Invalid option argument"
   puts opts.to_s
   exit
-rescue Twitter::Unauthorized
+rescue Twitter::Error::Unauthorized
   warn "Invalid authentication. Login with twt login user:pass"
   exit
 end
